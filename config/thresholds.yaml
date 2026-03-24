@@ -38,3 +38,7 @@ premium:
   peer_relative_strength_penalty: -0.03
   peer_relative_strength_bonus: 0.03
   outcome_lookback_signals: 250
+  event_risk_horizon_hours: 24
+  max_single_name_weight: 0.12
+  max_sector_weight: 0.35
+  gross_risk_budget: 0.75

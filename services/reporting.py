@@ -9,6 +9,10 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List
 
+from services.attribution import attribution_summary
+from services.execution_analytics import init_execution_db, execution_summary
+from services.walkforward import walkforward_summary
+
 
 def _markdown_table(headers: List[str], rows: List[List[Any]]) -> str:
     lines = ["| " + " | ".join(headers) + " |", "| " + " | ".join(["---"] * len(headers)) + " |"]
@@ -85,6 +89,28 @@ def generate_markdown_report(days: int = 7, db_path: str = "./storage/stock_aler
         reverse=True,
     )
     freq_by_brain = brain_counts.most_common()
+    exec_conn = init_execution_db(db_path)
+    exec_stats = execution_summary(exec_conn)
+    attribution = attribution_summary(conn)
+    walkforward = walkforward_summary(conn)
+
+    attr_brain_rows = []
+    for key, stats in sorted((attribution.get("by_brain") or {}).items(), key=lambda kv: kv[1].get("avg_return_pct", 0.0), reverse=True):
+        attr_brain_rows.append([key, stats.get("count", 0), f"{stats.get('win_rate', 0.0):.1%}", stats.get("avg_return_pct", 0.0)])
+
+    attr_regime_rows = []
+    for key, stats in sorted((attribution.get("by_regime") or {}).items(), key=lambda kv: kv[1].get("avg_return_pct", 0.0), reverse=True):
+        attr_regime_rows.append([key, stats.get("count", 0), f"{stats.get('win_rate', 0.0):.1%}", stats.get("avg_return_pct", 0.0)])
+
+    walk_rows = []
+    for window in (walkforward.get("windows") or [])[:4]:
+        walk_rows.append([
+            window.get("test_start", "")[:10],
+            window.get("test_end", "")[:10],
+            window.get("test", {}).get("count", 0),
+            window.get("test", {}).get("mean_pct", 0.0),
+            window.get("test", {}).get("sharpe_like", 0.0),
+        ])
 
     report_lines = [
         f"# Stock Alert Report ({days} day window)",
@@ -107,6 +133,25 @@ def generate_markdown_report(days: int = 7, db_path: str = "./storage/stock_aler
         "",
         "## Alert frequency by time of day (UTC)",
         _markdown_table(["Hour", "Alerts"], [[k, v] for k, v in sorted(hour_counts.items())] or [["none", 0]]),
+        "",
+        "## Execution quality",
+        _markdown_table(
+            ["Metric", "Value"],
+            [
+                ["Samples", exec_stats.get("count", 0)],
+                ["Avg latency (ms)", exec_stats.get("avg_latency_ms", 0.0)],
+                ["Avg proxy slippage (bps)", exec_stats.get("avg_proxy_slippage_bps", 0.0)],
+            ],
+        ),
+        "",
+        "## Attribution by brain",
+        _markdown_table(["Brain", "Count", "Win rate", "Avg return %"], attr_brain_rows or [["none", 0, "0.0%", 0.0]]),
+        "",
+        "## Attribution by regime",
+        _markdown_table(["Regime", "Count", "Win rate", "Avg return %"], attr_regime_rows or [["none", 0, "0.0%", 0.0]]),
+        "",
+        "## Walk-forward test windows",
+        _markdown_table(["Test start", "Test end", "Obs", "Mean %", "Sharpe-like"], walk_rows or [["none", "none", 0, 0.0, 0.0]]),
         "",
     ]
 

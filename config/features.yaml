@@ -14,6 +14,9 @@ feature_flags:
   enable_regime_gating: true
   enable_adaptive_brain_weighting: true
   enable_sector_rotation_brain: true
+  enable_event_risk_gating: true
+  enable_portfolio_optimizer: true
+  enable_pm_briefing: true
 
 runtime:
   enable_after_hours_alerts: false

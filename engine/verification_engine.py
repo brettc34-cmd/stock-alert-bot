@@ -21,6 +21,7 @@ SUPPRESSION_REASONS = {
     "market_closed_rule",
     "duplicate_state",
     "regime_mismatch",
+    "event_risk_window",
 }
 
 
@@ -159,6 +160,9 @@ def verify_signal(
     if signal.metadata.get("regime_blocked"):
         return False, "regime_mismatch"
 
+    if signal.metadata.get("event_risk_blocked"):
+        return False, "event_risk_window"
+
     if signal.metadata.get("conflicting_brains"):
         return False, "conflicting_brains"
 
@@ -219,6 +223,9 @@ def suppression_diagnostics(
 
     if signal.metadata.get("regime_blocked"):
         reasons.append("regime_mismatch")
+
+    if signal.metadata.get("event_risk_blocked"):
+        reasons.append("event_risk_window")
 
     if signal.metadata.get("conflicting_brains"):
         reasons.append("conflicting_brains")

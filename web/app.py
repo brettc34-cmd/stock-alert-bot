@@ -33,6 +33,9 @@ from safety.health_checks import health_status
 from config.settings import build_runtime_settings
 from services.metrics import render_metrics_payload
 from services.reporting import list_reports
+from services.execution_analytics import init_execution_db, execution_summary
+from services.attribution import attribution_summary
+from services.walkforward import walkforward_summary
 from telemetry import configure_opentelemetry
 
 
@@ -127,6 +130,19 @@ def outcomes():
     avg_return = sum(r[5] for r in rows) / total_trades if total_trades > 0 else 0
     total_pnl = sum(r[5] for r in rows)
     return render_template("outcomes.html", outcomes=rows, total_trades=total_trades, win_rate=win_rate, avg_return=avg_return, total_pnl=total_pnl)
+
+
+@app.route("/pm")
+@require_dashboard_key
+def pm_dashboard():
+    conn = init_db()
+    exec_conn = init_execution_db()
+    payload = {
+        "execution": execution_summary(exec_conn),
+        "attribution": attribution_summary(conn),
+        "walkforward": walkforward_summary(conn),
+    }
+    return jsonify(payload)
 
 
 @app.route("/run_bot", methods=["POST"])

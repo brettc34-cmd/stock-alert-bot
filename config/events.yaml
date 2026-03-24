@@ -1,0 +1,13 @@
+events:
+  - name: FOMC Rate Decision
+    type: macro
+    importance: high
+    datetime: "2026-04-29T18:00:00+00:00"
+  - name: CPI Release
+    type: macro
+    importance: high
+    datetime: "2026-04-10T12:30:00+00:00"
+  - name: NFP Payrolls
+    type: macro
+    importance: high
+    datetime: "2026-04-03T12:30:00+00:00"

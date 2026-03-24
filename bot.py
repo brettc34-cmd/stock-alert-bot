@@ -20,10 +20,12 @@ from brains.quant_brain import process_ladder_and_volume
 from brains.sector_rotation_brain import analyze as sector_rotation_analyze
 from brains.soros_brain import analyze as soros_analyze
 from config.settings import build_runtime_settings
+from data.event_calendar import load_event_calendar, resolve_event_risk
 from data.macro_data import fetch_macro_snapshot
 from data.market_data import fetch_quote
 from data.portfolio_data import load_portfolio
 from engine.context_overlay import apply_context_overlays
+from engine.portfolio_optimizer import optimize_targets
 from engine.regime_engine import classify_regime, regime_allows_signal
 from engine import decision_engine, throttler, verification_engine
 from engine.ranking_engine import rank_signals, ranking_score
@@ -32,8 +34,11 @@ from safety.data_validation import validate_config, validate_quote
 from safety.health_checks import ensure_state_has_keys
 from services.alert_router import AlertRouter
 from services.health import build_health
+from services.execution_analytics import init_execution_db, record_execution_metric, execution_summary
 from services.summary_engine import build_daily_summary
 from services.metrics import record_cycle_metrics, record_suppressions
+from services.attribution import attribution_summary
+from services.walkforward import walkforward_summary
 from storage.outcome_analytics import compute_brain_multipliers
 from storage.outcome_tracker import evaluate_pending_outcomes, init_outcomes_db
 from storage.sqlite_store import init_db, save_signal
@@ -155,6 +160,9 @@ def run_once(exit_on_market_closed: bool = False, now_et_override: datetime | No
     regime_gating_enabled = bool(features.get("feature_flags", {}).get("enable_regime_gating", True))
     adaptive_weighting_enabled = bool(features.get("feature_flags", {}).get("enable_adaptive_brain_weighting", True))
     sector_rotation_enabled = bool(features.get("feature_flags", {}).get("enable_sector_rotation_brain", True))
+    event_risk_enabled = bool(features.get("feature_flags", {}).get("enable_event_risk_gating", True))
+    optimizer_enabled = bool(features.get("feature_flags", {}).get("enable_portfolio_optimizer", True))
+    pm_briefing_enabled = bool(features.get("feature_flags", {}).get("enable_pm_briefing", True))
 
     logging.basicConfig(
         filename="bot.log",
@@ -199,12 +207,16 @@ def run_once(exit_on_market_closed: bool = False, now_et_override: datetime | No
     portfolio["rules"]["trim_warning_weight"] = settings.trim_warning_weight
 
     conn = init_db()
+    exec_conn = init_execution_db()
     outcome_lookback = int(premium_cfg.get("outcome_lookback_signals", 250))
     brain_multipliers = compute_brain_multipliers(conn, lookback=outcome_lookback) if adaptive_weighting_enabled else {}
 
     macro = fetch_macro_snapshot()
     regime_info = classify_regime(macro)
     regime = regime_info.get("regime", "balanced")
+    event_calendar = load_event_calendar("config/events.yaml")
+    event_horizon_hours = int(premium_cfg.get("event_risk_horizon_hours", 24))
+    event_risk = resolve_event_risk(now_market_tz, horizon_hours=event_horizon_hours, calendar=event_calendar)
 
     quotes: Dict[str, Dict] = {}
     raw_signals: List[Signal] = []
@@ -264,6 +276,18 @@ def run_once(exit_on_market_closed: bool = False, now_et_override: datetime | No
         signal.metadata.setdefault("trim_warning_weight", settings.trim_warning_weight)
         signal.metadata.setdefault("sector", quote.get("sector"))
         signal.metadata.setdefault("iv_rank", quote.get("iv_rank"))
+        signal.metadata.setdefault("event_risk_active", event_risk.active)
+        signal.metadata.setdefault("event_risk_horizon_hours", event_risk.horizon_hours)
+        signal.metadata.setdefault("event_risk_events", event_risk.events[:5])
+        signal.metadata.setdefault("decision_timestamp", datetime.now(timezone.utc).isoformat())
+        # PM accountability fields.
+        signal.metadata.setdefault("thesis_id", signal.cooldown_key)
+        if isinstance(signal.price, (int, float)) and isinstance(signal.change_pct, (int, float)):
+            shock = max(0.015, min(0.08, abs(signal.change_pct) * 1.5))
+            if signal.direction == "up":
+                signal.metadata.setdefault("invalidation_price", round(float(signal.price) * (1.0 - shock), 4))
+            elif signal.direction == "down":
+                signal.metadata.setdefault("invalidation_price", round(float(signal.price) * (1.0 + shock), 4))
         if signal.ticker in peer_rs:
             signal.metadata.setdefault("peer_relative_strength", peer_rs[signal.ticker])
 
@@ -280,12 +304,28 @@ def run_once(exit_on_market_closed: bool = False, now_et_override: datetime | No
     for signal in decided_signals:
         if regime_gating_enabled and not regime_allows_signal(signal.signal_type, regime):
             signal.metadata["regime_blocked"] = True
+        if event_risk_enabled and event_risk.active and signal.signal_type in {"breakout", "trend_continuation", "buy_the_dip", "dip", "quality_dip", "growth_value"}:
+            signal.metadata["event_risk_blocked"] = True
         signal.metadata.setdefault("regime_drivers", regime_info.get("drivers", []))
         signal.metadata.setdefault("yield_curve_10y_3m", macro.get("yield_curve_10y_3m"))
         signal.metadata.setdefault("credit_risk_proxy_20d", macro.get("credit_risk_proxy_20d"))
 
     router = AlertRouter(state=state, settings=settings, high_conviction_score=thresholds.get("confidence", {}).get("high_conviction_score", 80))
     approved_signals, suppressed_counts = router.filter_signals(decided_signals)
+
+    optimizer_plan = {
+        "targets": {},
+        "sector_targets": {},
+        "gross_target": 0.0,
+        "notes": ["disabled"],
+    }
+    if optimizer_enabled:
+        optimizer_plan = optimize_targets(
+            approved_signals,
+            max_single_name_weight=float(premium_cfg.get("max_single_name_weight", 0.12)),
+            max_sector_weight=float(premium_cfg.get("max_sector_weight", 0.35)),
+            gross_risk_budget=float(premium_cfg.get("gross_risk_budget", 0.75)),
+        )
 
     feature_digest = features.get("digest", {}).get("enabled", True)
     max_per_ticker_per_hour = thresholds.get("alerts", {}).get("max_per_ticker_per_hour", 2)
@@ -306,6 +346,7 @@ def run_once(exit_on_market_closed: bool = False, now_et_override: datetime | No
         if feature_digest:
             batched_messages.append(signal)
         else:
+            decision_time = datetime.now(timezone.utc)
             ok = send_discord_message(settings.discord_webhook_url, format_signal(signal))
             if ok:
                 webhook_sent_count += 1
@@ -315,6 +356,16 @@ def run_once(exit_on_market_closed: bool = False, now_et_override: datetime | No
                     suppressed_counts["persist_failed"] = suppressed_counts.get("persist_failed", 0) + 1
                     logging.error("persist_failed ticker=%s brain=%s", signal.ticker, signal.brain)
                     continue
+                dispatch_time = datetime.now(timezone.utc)
+                record_execution_metric(
+                    exec_conn,
+                    alert_id=alert_id,
+                    ticker=signal.ticker,
+                    decision_time=decision_time,
+                    dispatch_time=dispatch_time,
+                    decision_price=signal.price,
+                    dispatch_price=(quotes.get(signal.ticker) or {}).get("currentPrice"),
+                )
                 verification_engine.mark_sent(signal, state)
                 throttler.record_alert(state, signal.ticker)
                 sent_signals.append(signal)
@@ -350,12 +401,23 @@ def run_once(exit_on_market_closed: bool = False, now_et_override: datetime | No
         if digest_ok:
             webhook_sent_count += len(digest_signals)
         for sig in digest_signals:
+            decision_time = datetime.now(timezone.utc)
             alert_id = save_signal(conn, sig, analytics_context=_signal_analytics_context(sig, quotes))
             if not alert_id:
                 persist_failed_count += 1
                 suppressed_counts["persist_failed"] = suppressed_counts.get("persist_failed", 0) + 1
                 logging.error("persist_failed ticker=%s brain=%s", sig.ticker, sig.brain)
                 continue
+            dispatch_time = datetime.now(timezone.utc)
+            record_execution_metric(
+                exec_conn,
+                alert_id=alert_id,
+                ticker=sig.ticker,
+                decision_time=decision_time,
+                dispatch_time=dispatch_time,
+                decision_price=sig.price,
+                dispatch_price=(quotes.get(sig.ticker) or {}).get("currentPrice"),
+            )
             verification_engine.mark_sent(sig, state)
             throttler.record_alert(state, sig.ticker)
             sent_signals.append(sig)
@@ -366,6 +428,19 @@ def run_once(exit_on_market_closed: bool = False, now_et_override: datetime | No
         for s in top:
             lines.append(f"- {s.ticker} | {s.signal_type} | {s.confidence} | {s.brain} | {s.action_bias}")
         send_discord_message(settings.discord_webhook_url, "\n".join(lines))
+
+    if pm_briefing_enabled:
+        top_targets = list((optimizer_plan.get("targets") or {}).items())[:3]
+        if top_targets:
+            pm_lines = ["PM Briefing: Top Target Weights"]
+            for ticker, weight in top_targets:
+                pm_lines.append(f"- {ticker}: {weight:.1%}")
+            pm_lines.append(f"Regime: {regime}")
+            send_discord_message(settings.discord_webhook_url, "\n".join(pm_lines))
+
+    exec_summary = execution_summary(exec_conn)
+    attribution = attribution_summary(conn)
+    walkforward = walkforward_summary(conn)
 
     health = build_health(state, settings)
     summary = build_daily_summary(sent_signals, suppressed_counts, health)
@@ -379,6 +454,12 @@ def run_once(exit_on_market_closed: bool = False, now_et_override: datetime | No
         "signal_counts_by_brain": summary.get("signal_counts_by_brain", {}),
         "market_regime": regime,
         "regime_drivers": regime_info.get("drivers", []),
+        "event_risk_active": event_risk.active,
+        "event_risk_events": event_risk.events[:5],
+        "optimizer_plan": optimizer_plan,
+        "execution_summary": exec_summary,
+        "attribution": attribution,
+        "walkforward": walkforward,
     }
     state["last_run"] = datetime.now(timezone.utc).isoformat()
 
