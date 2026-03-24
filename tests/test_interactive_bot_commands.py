@@ -226,6 +226,18 @@ def test_chat_answer_sp500_returns_overview(monkeypatch):
     assert "licensed professional" in result
 
 
+def test_chat_answer_research_routes_to_ticker_research(monkeypatch):
+    monkeypatch.setattr(
+        "interactive_discord_bot.build_ticker_research",
+        lambda ticker: f"Research: {ticker}\n- Brain consensus: bullish=2, bearish=1, risk_flags=1",
+    )
+
+    result = asyncio.run(_chat_answer("research nvda", is_admin=False))
+
+    assert result.startswith("Research: NVDA")
+    assert "Brain consensus" in result
+
+
 def test_looks_like_chat_addressed_with_prefix(monkeypatch):
     monkeypatch.delenv("DISCORD_CHAT_MODE", raising=False)
     msg = FakeMessage("!sa status")
@@ -242,6 +254,7 @@ def test_keyword_trigger_detects_known_commands():
     assert _is_keyword_trigger("status") is True
     assert _is_keyword_trigger("top 3") is True
     assert _is_keyword_trigger("s&p") is True
+    assert _is_keyword_trigger("research nvda") is True
     assert _is_keyword_trigger("hello there") is False
 
 

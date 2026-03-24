@@ -90,6 +90,7 @@ from services.core import (
     status_snapshot,
     update_market_config,
 )
+from services.ticker_research import build_ticker_research
 from services.metrics import record_interactive_command
 from services.run_cooldown_store import RunCooldownStore
 from telemetry import configure_opentelemetry, get_tracer
@@ -239,10 +240,30 @@ def _is_keyword_trigger(content: str) -> bool:
         "config",
         "help",
         "brains",
+        "research",
+        "analyze",
+        "analyse",
+        "ticker",
+        "stock",
         "explain",
         "why",
     )
     return any(content == t or content.startswith(f"{t} ") for t in triggers)
+
+
+def _extract_research_ticker(text: str) -> str | None:
+    q = (text or "").strip()
+    if not q:
+        return None
+    patterns = (
+        r"^(?:research|analyze|analyse|ticker|stock)\s+\$?([A-Za-z][A-Za-z0-9\.-]{0,7})\b",
+        r"^\$([A-Za-z][A-Za-z0-9\.-]{0,7})\b",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, q, flags=re.IGNORECASE)
+        if match:
+            return match.group(1).upper()
+    return None
 
 
 def _is_reply_to_bot(message: Any) -> bool:
@@ -286,10 +307,10 @@ def _format_status_text(data: dict[str, object]) -> str:
 
 def _help_text() -> str:
     return (
-        "Try: status, run, top 5, summary 5, config, brains, help\n"
+        "Try: status, run, top 5, summary 5, config, research NVDA, brains, help\n"
         "Try: update for a broader market snapshot or s&p for the mobile S&P 500 daily overview.\n"
         "You can use slash commands or message me directly.\n"
-        "Examples: `@bot top 3`, `!sa summary`, `update`, `s&p`, or DM `run`."
+        "Examples: `@bot top 3`, `!sa research MSFT`, `update`, `s&p`, or DM `run`."
     )
 
 
@@ -329,6 +350,10 @@ async def _chat_answer(query: str, is_admin: bool) -> str:
             warn_text = "\n".join(f"- {w}" for w in result.warnings[:3])
             return f"{result.body}\n\n*Data notes:*\n{warn_text}"
         return result.body
+
+    ticker = _extract_research_ticker(query)
+    if ticker:
+        return await asyncio.to_thread(build_ticker_research, ticker)
 
     if q.startswith("top") or " top " in f" {q} ":
         n = _top_n_from_text(q, default=5, min_n=1, max_n=10)
@@ -568,6 +593,7 @@ async def handle_help(interaction: Any) -> None:
             "/status - current run metrics and suppressions\n"
             "/update - generate today's broader market update preview\n"
             "/sp500 - generate the mobile S&P 500 daily overview\n"
+            "/research <ticker> - run on-demand brain analysis for one stock\n"
             "/run - execute one cycle now (admin only, cooldown enforced)\n"
             "/top n - show top ranked recent signals\n"
             "/summary n - summarize recent alerts and analytics\n"
@@ -605,6 +631,19 @@ async def handle_sp500(interaction: Any) -> None:
     await _execute_instrumented("sp500", interaction, _inner)
 
 
+async def handle_research(interaction: Any, ticker: str) -> None:
+    async def _inner() -> None:
+        symbol = (ticker or "").strip().upper()
+        if not symbol:
+            await interaction.response.send_message("Please provide a ticker symbol, e.g. /research NVDA", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        text = await asyncio.to_thread(build_ticker_research, symbol)
+        await interaction.followup.send(text, ephemeral=True)
+
+    await _execute_instrumented("research", interaction, _inner)
+
+
 @bot.tree.command(name="status", description="Show latest bot run status")
 async def status_cmd(interaction: Any) -> None:
     await handle_status(interaction)
@@ -618,6 +657,12 @@ async def update_cmd(interaction: Any) -> None:
 @bot.tree.command(name="sp500", description="Generate the S&P 500 daily overview")
 async def sp500_cmd(interaction: Any) -> None:
     await handle_sp500(interaction)
+
+
+@bot.tree.command(name="research", description="Research a ticker using the internal brain stack")
+@app_commands.describe(ticker="Ticker symbol, e.g. NVDA")
+async def research_cmd(interaction: Any, ticker: str) -> None:
+    await handle_research(interaction, ticker=ticker)
 
 
 @bot.tree.command(name="run", description="Run one alert cycle now (admin only)")
