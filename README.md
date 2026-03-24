@@ -108,6 +108,30 @@ python bot.py --scheduler
 This replaces launchd as the primary scheduling method. The launchd plist is deprecated.
 The internal scheduler now also runs a nightly report job based on `REPORT_TIME` and `REPORT_DAYS`, a weekday broader market preview job using `MARKET_UPDATE_TIME` and `MARKET_UPDATE_TIMEZONE`, and a weekday S&P 500 overview delivery job using `SP500_OVERVIEW_TIME` and `SP500_OVERVIEW_TIMEZONE`.
 
+## Run when your computer is off
+
+Use GitHub Actions to run the full alert cycle in the cloud every 15 minutes on weekdays.
+
+Workflow file:
+
+- `.github/workflows/alert-cycles.yml`
+
+Setup:
+
+1. Push this repo to GitHub.
+2. In GitHub, open Settings -> Secrets and variables -> Actions.
+3. Add `DISCORD_WEBHOOK_URL` as a repository secret.
+4. Optional secrets (override defaults): `MARKET_TIMEZONE`, `MARKET_OPEN`, `MARKET_CLOSE`, `ENABLE_AFTER_HOURS_ALERTS`.
+5. Open Actions and enable the `alert-cycles` workflow.
+
+How it works:
+
+- Runs `python bot.py` on `ubuntu-latest`.
+- Uses cache restore/save so `state.json`, `anchors.json`, and SQLite files persist across runs.
+- If the market is closed, the run exits cleanly without sending alerts.
+
+This gives you alerts even when your local machine is powered off.
+
 ## Optional service installation
 
 ### Linux / Raspberry Pi via systemd
