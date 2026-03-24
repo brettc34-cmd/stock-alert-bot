@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Stock Alert Bot - Reports</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 20px; }
+    ul { padding-left: 20px; }
+  </style>
+</head>
+<body>
+  <h1>Generated Reports</h1>
+  {% if reports %}
+  <ul>
+    {% for report in reports %}
+    <li><a href="/reports/{{ report }}">{{ report }}</a></li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p>No reports found.</p>
+  {% endif %}
+</body>
+</html>

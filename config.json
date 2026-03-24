@@ -1,0 +1,23 @@
+{
+  "stocks": [
+    "NVDA",
+    "AXP",
+    "AAPL",
+    "VLO",
+    "CVX",
+    "XOM",
+    "OXY",
+    "KO",
+    "O",
+    "MO"
+  ],
+  "ladder_step": 5,
+  "volume_threshold": 1.5,
+  "check_interval_minutes": 30,
+  "market_hours": {
+    "open": "09:30",
+    "close": "16:00",
+    "timezone": "US/Eastern"
+  },
+  "discord_webhook": ""
+}

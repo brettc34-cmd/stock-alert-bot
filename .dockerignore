@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+.venv/
+.env
+.git/
+.pytest_cache/
+launchd.out.log
+launchd.err.log
+bot.log

@@ -1,0 +1,18 @@
+[Unit]
+Description=Stock Alert Bot (local scheduler)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__SERVICE_USER__
+WorkingDirectory=__PROJECT_ROOT__
+EnvironmentFile=/etc/stock-alert-bot.env
+ExecStart=/usr/bin/env python3 bot.py --scheduler
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

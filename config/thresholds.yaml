@@ -1,0 +1,40 @@
+# Thresholds and tuning parameters for signals
+
+confidence:
+  min_send_score: 50
+  high_conviction_score: 80
+
+cooldowns:
+  default_seconds: 5400  # 90 minutes
+  per_signal_seconds: 3600
+
+volume:
+  unusual_volume_multiplier: 1.5
+
+alerts:
+  max_per_ticker_per_hour: 2
+  max_per_run: 5
+
+runtime:
+  alert_cooldown_minutes: 90
+  earnings_risk_window_days: 7
+  min_confirmations_normal: 2
+  min_confirmations_high: 3
+  log_level: INFO
+  dashboard_port: 8000
+
+portfolio:
+  max_position_weight_add: 0.15
+  trim_warning_weight: 0.20
+
+market:
+  stale_quote_max_age_seconds: 300
+  breakout_volume_ratio: 1.5
+  strong_breakout_volume_ratio: 2.0
+
+premium:
+  sector_leader_return_20d: 0.03
+  sector_laggard_return_20d: -0.03
+  peer_relative_strength_penalty: -0.03
+  peer_relative_strength_bonus: 0.03
+  outcome_lookback_signals: 250

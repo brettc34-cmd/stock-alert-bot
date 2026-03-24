@@ -1,0 +1,25 @@
+name: daily-sp500-overview
+
+on:
+  schedule:
+    - cron: '*/15 11-14 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  send-overview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Send S&P 500 overview if inside schedule window
+        run: python scripts/send_sp500_overview.py --respect-schedule
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          SP500_OVERVIEW_ENABLED: '1'
+          SP500_OVERVIEW_TIME: ${{ secrets.SP500_OVERVIEW_TIME }}
+          SP500_OVERVIEW_TIMEZONE: ${{ secrets.SP500_OVERVIEW_TIMEZONE }}
+          SP500_OVERVIEW_MAX_WORDS: ${{ secrets.SP500_OVERVIEW_MAX_WORDS }}

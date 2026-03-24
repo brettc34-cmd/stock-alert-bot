@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Stock Alert Bot - Signals</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 20px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ccc; padding: 8px; }
+    th { background: #f5f5f5; }
+    .filter { margin-bottom: 20px; }
+    .filter input, .filter select { margin-right: 10px; }
+    .run-btn { background: #007bff; color: white; padding: 10px 20px; border: none; cursor: pointer; }
+    .run-btn:hover { background: #0056b3; }
+  </style>
+</head>
+<body>
+  <h1>Recent Signals</h1>
+
+  <div class="filter">
+    <input type="text" id="tickerFilter" placeholder="Filter by ticker">
+    <select id="brainFilter">
+      <option value="">All Brains</option>
+      <option value="Quant">Quant</option>
+      <option value="Buffett">Buffett</option>
+      <option value="Druckenmiller">Druckenmiller</option>
+      <option value="Lynch">Lynch</option>
+      <option value="Analyst">Analyst</option>
+      <option value="Soros">Soros</option>
+      <option value="Dalio">Dalio</option>
+    </select>
+    <button onclick="filterTable()">Filter</button>
+    <button onclick="exportCSV()">Export CSV</button>
+    <button class="run-btn" onclick="runBot()">Run Bot Now</button>
+  </div>
+
+  <table id="signalsTable">
+    <thead>
+      <tr>
+        <th>Time</th>
+        <th>Ticker</th>
+        <th>Brain</th>
+        <th>Signal Type</th>
+        <th>Confidence</th>
+        <th>Priority</th>
+        <th>Action Bias</th>
+        <th>Confirms</th>
+        <th>Summary</th>
+        <th>Portfolio Note</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for sig in signals %}
+      <tr>
+        <td>{{ sig.created_at }}</td>
+        <td>{{ sig.ticker }}</td>
+        <td>{{ sig.brain }}</td>
+        <td>{{ sig.signal_type }}</td>
+        <td>{{ sig.confidence }}</td>
+        <td>{{ sig.priority }}</td>
+        <td>{{ sig.action_bias }}</td>
+        <td>{{ sig.confirmations }}</td>
+        <td>{{ sig.summary }}</td>
+        <td>{{ sig.portfolio_note }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h2>Suppression Counts</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Reason</th>
+        <th>Count</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for reason, count in suppressions.items() %}
+      <tr>
+        <td>{{ reason }}</td>
+        <td>{{ count }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <script>
+    function filterTable() {
+      const ticker = document.getElementById('tickerFilter').value.toLowerCase();
+      const brain = document.getElementById('brainFilter').value;
+      const rows = document.querySelectorAll('#signalsTable tbody tr');
+
+      rows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        const rowTicker = cells[1].textContent.toLowerCase();
+        const rowBrain = cells[2].textContent;
+
+        const matchesTicker = !ticker || rowTicker.includes(ticker);
+        const matchesBrain = !brain || rowBrain === brain;
+
+        row.style.display = matchesTicker && matchesBrain ? '' : 'none';
+      });
+    }
+
+    function exportCSV() {
+      const table = document.getElementById('signalsTable');
+      let csv = [];
+      for (let row of table.rows) {
+        let cols = [];
+        for (let cell of row.cells) {
+          cols.push(cell.innerText);
+        }
+        csv.push(cols.join(','));
+      }
+      const csvContent = csv.join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'signals.csv';
+      a.click();
+      window.URL.revokeObjectURL(url);
+    }
+
+    function runBot() {
+      if (confirm('Run the bot now? This may take a few minutes.')) {
+        const existing = localStorage.getItem('dashboardApiKey') || '';
+        const key = prompt('Enter dashboard API key (X-API-KEY):', existing);
+        if (!key) {
+          alert('Missing API key.');
+          return;
+        }
+        localStorage.setItem('dashboardApiKey', key);
+        fetch('/run_bot', {
+          method: 'POST',
+          headers: { 'X-API-KEY': key }
+        })
+          .then(response => response.json())
+          .then(data => alert(data.message))
+          .catch(error => alert('Error running bot: ' + error));
+      }
+    }
+  </script>
+</body>
+</html>

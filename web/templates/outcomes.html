@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Stock Alert Bot - Outcomes</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 20px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ccc; padding: 8px; }
+    th { background: #f5f5f5; }
+    .stats { margin-bottom: 20px; }
+    .export-btn { background: #28a745; color: white; padding: 10px 20px; border: none; cursor: pointer; }
+    .export-btn:hover { background: #218838; }
+  </style>
+</head>
+<body>
+  <h1>Signal Outcomes</h1>
+
+  <div class="stats">
+    <h2>Summary Stats</h2>
+    <p>Total Trades: {{ total_trades }}</p>
+    <p>Win Rate: {{ '%.2f'|format(win_rate*100) }}%</p>
+    <p>Average Return: {{ '%.2f'|format(avg_return*100) }}%</p>
+    <p>Total P&L: {{ '%.2f'|format(total_pnl*100) }}%</p>
+    <button class="export-btn" onclick="exportCSV()">Export CSV</button>
+  </div>
+
+  <table id="outcomesTable">
+    <thead>
+      <tr>
+        <th>Alert ID</th>
+        <th>Time</th>
+        <th>Ticker</th>
+        <th>Action</th>
+        <th>Outcome</th>
+        <th>Return %</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for o in outcomes %}
+      <tr>
+        <td>{{ o[0] }}</td>
+        <td>{{ o[2] }}</td>
+        <td>{{ o[1] }}</td>
+        <td>{{ o[3] }}</td>
+        <td>{{ o[4] }}</td>
+        <td>{{ '%.2f'|format(o[5]*100) }}%</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <script>
+    function exportCSV() {
+      const table = document.getElementById('outcomesTable');
+      let csv = [];
+      for (let row of table.rows) {
+        let cols = [];
+        for (let cell of row.cells) {
+          cols.push(cell.innerText);
+        }
+        csv.push(cols.join(','));
+      }
+      const csvContent = csv.join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'outcomes.csv';
+      a.click();
+      window.URL.revokeObjectURL(url);
+    }
+  </script>
+</body>
+</html>

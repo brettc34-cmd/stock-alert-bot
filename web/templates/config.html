@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Stock Alert Bot - Config</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 20px; }
+    textarea { width: 100%; height: 420px; font-family: monospace; }
+  </style>
+</head>
+<body>
+  <h1>Config Editor</h1>
+  {% if error %}
+  <p style="color: #a40000; font-weight: 600;">{{ error }}</p>
+  {% endif %}
+  {% if success %}
+  <p style="color: #0a7a0a; font-weight: 600;">{{ success }}</p>
+  {% endif %}
+  <form method="post">
+    <h2>Thresholds</h2>
+    <textarea name="thresholds">{{ thresholds }}</textarea>
+
+    <h2>Features</h2>
+    <textarea name="features">{{ features }}</textarea>
+
+    <button type="submit">Save</button>
+  </form>
+  <p>Note: this edits <code>config/thresholds.yaml</code> and <code>config/features.yaml</code>.</p>
+</body>
+</html>

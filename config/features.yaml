@@ -1,0 +1,19 @@
+digest:
+  enabled: true
+  max_signals: 8
+  send_at_end: true
+  display_mode: pro
+  use_embed: false
+  use_colored_embed_scheme: true
+  show_signal_agreement: true
+
+feature_flags:
+  enable_dashboard: true
+  enable_backtest: true
+  enable_outcome_tracking: true
+  enable_regime_gating: true
+  enable_adaptive_brain_weighting: true
+  enable_sector_rotation_brain: true
+
+runtime:
+  enable_after_hours_alerts: false
