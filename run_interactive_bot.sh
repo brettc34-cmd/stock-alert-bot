@@ -10,12 +10,17 @@ if [[ -f .env ]]; then
   set +a
 fi
 
-PYTHON=${PYTHON:-python3}
-
 if [[ ! -d .venv ]]; then
   echo "error: .venv not found. Create it with: python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt" >&2
   exit 1
 fi
 
-source .venv/bin/activate
+PYTHON=${PYTHON:-"$(pwd)/.venv/bin/python3.13"}
+if [[ ! -x "$PYTHON" ]]; then
+  PYTHON="$(pwd)/.venv/bin/python3"
+fi
+if [[ ! -x "$PYTHON" ]]; then
+  PYTHON="$(pwd)/.venv/bin/python"
+fi
+
 exec "$PYTHON" interactive_discord_bot.py
