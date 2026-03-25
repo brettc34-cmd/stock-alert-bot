@@ -30,6 +30,8 @@ from engine.regime_engine import classify_regime, regime_allows_signal
 from engine import decision_engine, throttler, verification_engine
 from engine.ranking_engine import rank_signals, ranking_score
 from engine.signal_models import Signal
+from engine.signal_completion import complete_signal_for_premium_quality
+from engine.state_manager import initialize_premium_state, update_cycle_metrics, sanitize_state_for_json
 from safety.data_validation import validate_config, validate_quote
 from safety.health_checks import ensure_state_has_keys
 from services.alert_router import AlertRouter
@@ -171,6 +173,9 @@ def run_once(exit_on_market_closed: bool = False, now_et_override: datetime | No
     )
 
     ensure_state_has_keys(state)
+    
+    # Upgrade to premium state schema
+    state = initialize_premium_state(state)
 
     if not validate_config(config):
         raise SystemExit("Invalid config.json")
@@ -290,6 +295,13 @@ def run_once(exit_on_market_closed: bool = False, now_et_override: datetime | No
                 signal.metadata.setdefault("invalidation_price", round(float(signal.price) * (1.0 + shock), 4))
         if signal.ticker in peer_rs:
             signal.metadata.setdefault("peer_relative_strength", peer_rs[signal.ticker])
+
+    # Apply premium decision-grade signal completion
+    for signal in raw_signals:
+        try:
+            complete_signal_for_premium_quality(signal, quotes)
+        except Exception as exc:
+            logging.warning("signal_completion_error ticker=%s brain=%s error=%s", signal.ticker, signal.brain, exc)
 
     _annotate_conflicting_brains(raw_signals)
 
@@ -464,7 +476,7 @@ def run_once(exit_on_market_closed: bool = False, now_et_override: datetime | No
     state["last_run"] = datetime.now(timezone.utc).isoformat()
 
     _save_json("anchors.json", anchors)
-    _save_json("state.json", state)
+    _save_json("state.json", sanitize_state_for_json(state))
 
     if features.get("feature_flags", {}).get("enable_outcome_tracking", True):
         conn_out = init_outcomes_db()
