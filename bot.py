@@ -442,13 +442,40 @@ def run_once(exit_on_market_closed: bool = False, now_et_override: datetime | No
         send_discord_message(settings.discord_webhook_url, "\n".join(lines))
 
     if pm_briefing_enabled:
+        pm_lines = ["**PM Briefing**"]
+
+        # Cycle quality score (how many raw signals survived to dispatch)
+        total_raw = len(raw_signals)
+        total_approved = len(approved_signals)
+        total_sent = len(sent_signals)
+        if total_raw > 0:
+            quality_pct = int(round(total_sent / total_raw * 100))
+            pm_lines.append(f"Cycle Quality: {total_sent}/{total_raw} signals sent ({quality_pct}%)")
+
+        # Regime and macro context
+        regime_label = regime.replace("_", " ").title()
+        drivers_str = ", ".join(regime_info.get("drivers", [])) or "none"
+        pm_lines.append(f"Regime: {regime_label} (drivers: {drivers_str})")
+
+        # Event risk
+        if event_risk.active:
+            event_names = ", ".join(e.get("name", "unknown") for e in (event_risk.events or [])[:3])
+            pm_lines.append(f"Event Risk: ACTIVE — {event_names or 'see calendar'}")
+
+        # Top optimizer allocation targets
         top_targets = list((optimizer_plan.get("targets") or {}).items())[:3]
         if top_targets:
-            pm_lines = ["PM Briefing: Top Target Weights"]
+            pm_lines.append("Top Targets:")
             for ticker, weight in top_targets:
-                pm_lines.append(f"- {ticker}: {weight:.1%}")
-            pm_lines.append(f"Regime: {regime}")
-            send_discord_message(settings.discord_webhook_url, "\n".join(pm_lines))
+                pm_lines.append(f"  {ticker}: {weight:.1%}")
+
+        # Top suppression reasons this cycle
+        if suppressed_counts:
+            top_suppressions = sorted(suppressed_counts.items(), key=lambda kv: kv[1], reverse=True)[:3]
+            sup_str = ", ".join(f"{r}×{n}" for r, n in top_suppressions)
+            pm_lines.append(f"Top Suppressions: {sup_str}")
+
+        send_discord_message(settings.discord_webhook_url, "\n".join(pm_lines))
 
     exec_summary = execution_summary(exec_conn)
     attribution = attribution_summary(conn)

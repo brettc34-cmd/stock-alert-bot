@@ -8,7 +8,7 @@ from typing import Any, Dict, Iterable, List
 from engine.signal_models import Signal
 
 
-ADD_TYPES = {"breakout", "trend_continuation", "buy_the_dip", "dip", "quality_dip", "growth_value", "earnings_catalyst"}
+ADD_TYPES = {"breakout", "trend_continuation", "buy_the_dip", "dip", "quality_dip", "growth_value", "earnings_catalyst", "catalyst_watch"}
 
 
 def _corr_penalty(signal: Signal, others: Iterable[Signal]) -> float:

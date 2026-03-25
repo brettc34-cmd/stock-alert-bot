@@ -1,6 +1,11 @@
 from scheduler import build_scheduler, run_report_job
 from config.settings import RuntimeSettings
 
+try:
+    from apscheduler.schedulers.base import SchedulerNotRunningError as _SchedulerNotRunningError
+except Exception:  # pragma: no cover - fallback path without apscheduler
+    _SchedulerNotRunningError = Exception
+
 
 def test_scheduler_registers_open_and_close_jobs():
     settings = RuntimeSettings(
@@ -18,7 +23,11 @@ def test_scheduler_registers_open_and_close_jobs():
     assert "nightly_report" in jobs
     assert "daily_market_update" in jobs
     assert "daily_sp500_overview" in jobs
-    scheduler.shutdown(wait=False)
+    # build_scheduler does not call .start(), so shutdown raises SchedulerNotRunningError.
+    try:
+        scheduler.shutdown(wait=False)
+    except _SchedulerNotRunningError:
+        pass
 
 
 def test_report_job_calls_generator_with_days_argument():

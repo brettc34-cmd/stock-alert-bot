@@ -14,6 +14,7 @@ def classify_regime(macro: Dict[str, Any]) -> Dict[str, Any]:
     vix = macro.get("vix")
     spx_price = macro.get("spx_price")
     spx_ma200 = macro.get("spx_ma200")
+    spx_return_20d = macro.get("spx_return_20d")
     curve = macro.get("yield_curve_10y_3m")
     credit = macro.get("credit_risk_proxy_20d")
 
@@ -21,7 +22,10 @@ def classify_regime(macro: Dict[str, Any]) -> Dict[str, Any]:
     drivers = []
 
     if isinstance(vix, (int, float)):
-        if vix >= 28:
+        if vix >= 35:
+            score -= 3
+            drivers.append("crisis_vix")
+        elif vix >= 28:
             score -= 2
             drivers.append("high_vix")
         elif vix <= 18:
@@ -35,6 +39,14 @@ def classify_regime(macro: Dict[str, Any]) -> Dict[str, Any]:
         else:
             score += 1
             drivers.append("spx_above_ma200")
+
+    if isinstance(spx_return_20d, (int, float)):
+        if spx_return_20d <= -0.05:
+            score -= 2
+            drivers.append("momentum_negative")
+        elif spx_return_20d >= 0.05:
+            score += 1
+            drivers.append("momentum_positive")
 
     if isinstance(curve, (int, float)):
         if curve < 0:

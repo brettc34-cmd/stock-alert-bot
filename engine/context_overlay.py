@@ -7,8 +7,8 @@ from typing import Any, Dict, Iterable, List
 from engine.signal_models import Signal
 
 
-ADD_SIGNAL_TYPES = {"breakout", "trend_continuation", "buy_the_dip", "dip", "quality_dip", "growth_value"}
-RISK_SIGNAL_TYPES = {"risk", "concentration_risk", "macro_divergence"}
+ADD_SIGNAL_TYPES = {"breakout", "trend_continuation", "buy_the_dip", "dip", "quality_dip", "growth_value", "earnings_catalyst", "catalyst_watch"}
+RISK_SIGNAL_TYPES = {"risk", "concentration_risk", "macro_divergence", "overlap_exposure_warning", "trim_watch"}
 
 
 def _sector_strength_for_signal(signal: Signal, macro: Dict[str, Any]) -> float | None:
@@ -52,9 +52,13 @@ def apply_context_overlays(
             adjustments.append("regime_risk_on_add_bonus")
 
         vix = macro.get("vix")
-        if isinstance(vix, (int, float)) and vix >= 30 and sig_type in ADD_SIGNAL_TYPES:
-            conf -= 8
-            adjustments.append("high_vix_penalty")
+        if isinstance(vix, (int, float)) and sig_type in ADD_SIGNAL_TYPES:
+            if vix >= 40:
+                conf -= 15
+                adjustments.append("crisis_vix_penalty")
+            elif vix >= 30:
+                conf -= 8
+                adjustments.append("high_vix_penalty")
 
         curve = macro.get("yield_curve_10y_3m")
         if isinstance(curve, (int, float)) and curve < 0 and sig_type in ADD_SIGNAL_TYPES:

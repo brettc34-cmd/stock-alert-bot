@@ -7,15 +7,27 @@ from engine.signal_models import Signal
 
 
 CATEGORY_PRIORITY = {
-    "unusual_volume": 3,
+    # High-priority directional signals
     "breakout": 5,
     "trend_continuation": 5,
+    # Dip / value entry signals
     "dip": 4,
     "quality_dip": 4,
     "buy_the_dip": 4,
+    "growth_value": 4,
+    # Event-driven signals — high urgency when firing
+    "earnings_catalyst": 4,
+    # Sector and analyst signals
+    "catalyst_watch": 3,
+    "sector_rotation": 3,
+    "unusual_volume": 3,
+    "quant_anomaly": 3,
+    # Risk / concentration signals — lower than opportunity signals but important
     "risk": 2,
     "concentration_risk": 2,
     "macro_divergence": 2,
+    "overlap_exposure_warning": 2,
+    "trim_watch": 2,
 }
 
 
