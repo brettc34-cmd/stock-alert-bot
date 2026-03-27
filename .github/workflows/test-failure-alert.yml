@@ -1,0 +1,41 @@
+name: test-failure-alert
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  intentional-failure:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail intentionally to trigger failure notification
+        run: exit 1
+
+  notify-on-failure:
+    needs: intentional-failure
+    if: ${{ always() && needs.intentional-failure.result == 'failure' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send failure alert to Discord
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          WORKFLOW: ${{ github.workflow }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "DISCORD_WEBHOOK_URL secret is missing; skipping failure notification."
+            exit 0
+          fi
+          payload=$(cat <<EOF
+          {
+            "content": "Alert workflow failed. Workflow: ${WORKFLOW} | Repo: ${REPO} | Branch: ${BRANCH} | Run: ${RUN_URL}"
+          }
+          EOF
+          )
+          curl -sS -X POST "$DISCORD_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$payload"
