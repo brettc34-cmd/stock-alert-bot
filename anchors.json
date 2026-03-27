@@ -1,13 +1,13 @@
 {
   "NVDA": {
-    "anchor": 176.0,
-    "next_up": 181.0,
-    "next_down": 171.0
+    "anchor": 171.0,
+    "next_up": 176.0,
+    "next_down": 166.0
   },
   "AXP": {
-    "anchor": 300.99,
-    "next_up": 305.99,
-    "next_down": 295.99
+    "anchor": 295.99,
+    "next_up": 300.99,
+    "next_down": 290.99
   },
   "AAPL": {
     "anchor": 255.81,
@@ -15,9 +15,9 @@
     "next_down": 250.81
   },
   "VLO": {
-    "anchor": 236.05,
-    "next_up": 241.05,
-    "next_down": 231.05
+    "anchor": 251.05,
+    "next_up": 256.05,
+    "next_down": 246.05
   },
   "CVX": {
     "anchor": 206.79,
@@ -25,9 +25,9 @@
     "next_down": 201.79
   },
   "XOM": {
-    "anchor": 161.58,
-    "next_up": 166.58,
-    "next_down": 156.58
+    "anchor": 166.58,
+    "next_up": 171.58,
+    "next_down": 161.58
   },
   "OXY": {
     "anchor": 60.58,

@@ -105,6 +105,16 @@ Cross-platform internal scheduler:
 python bot.py --scheduler
 ```
 
+Webhook startup self-check:
+
+```bash
+python bot.py --self-check-webhook
+```
+
+This verifies that `DISCORD_WEBHOOK_URL` is not a placeholder, has the expected Discord webhook path, and responds from Discord.
+`run_bot.sh` and `run_scheduler.sh` now execute this check before startup by default.
+Set `WEBHOOK_STARTUP_SELF_CHECK=0` to bypass it temporarily.
+
 This replaces launchd as the primary scheduling method. The launchd plist is deprecated.
 The internal scheduler now also runs a nightly report job based on `REPORT_TIME` and `REPORT_DAYS`, a weekday broader market preview job using `MARKET_UPDATE_TIME` and `MARKET_UPDATE_TIMEZONE`, and a weekday S&P 500 overview delivery job using `SP500_OVERVIEW_TIME` and `SP500_OVERVIEW_TIMEZONE`.
 
@@ -129,6 +139,7 @@ How it works:
 - Runs `python bot.py` on `ubuntu-latest`.
 - Uses cache restore/save so `state.json`, `anchors.json`, and SQLite files persist across runs.
 - If the market is closed, the run exits cleanly without sending alerts.
+- If a cloud run fails, the workflow posts a Discord failure notification to `DISCORD_WEBHOOK_URL` with a link to the failed run.
 
 This gives you alerts even when your local machine is powered off.
 

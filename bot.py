@@ -10,7 +10,12 @@ except Exception:  # pragma: no cover - fallback path for environments without p
     pytz = None
 
 from alerts.digest_formatter import format_digest, format_digest_payload
-from alerts.discord_formatter import send_discord_message, send_discord_payload, format_signal
+from alerts.discord_formatter import (
+    send_discord_message,
+    send_discord_payload,
+    format_signal,
+    self_check_discord_webhook,
+)
 from brains.analyst_brain import analyze as analyst_analyze
 from brains.buffett_brain import analyze as buffett_analyze
 from brains.dalio_brain import analyze as dalio_analyze
@@ -536,7 +541,19 @@ def run_once(exit_on_market_closed: bool = False, now_et_override: datetime | No
 def main() -> None:
     parser = argparse.ArgumentParser(description="Stock Alert Bot runner")
     parser.add_argument("--scheduler", action="store_true", help="Run internal scheduler loop")
+    parser.add_argument(
+        "--self-check-webhook",
+        action="store_true",
+        help="Validate and live-check DISCORD_WEBHOOK_URL, then exit",
+    )
     args = parser.parse_args()
+
+    if args.self_check_webhook:
+        config = _load_json("config.json")
+        settings = build_runtime_settings(config)
+        ok, message = self_check_discord_webhook(settings.discord_webhook_url)
+        print(message)
+        raise SystemExit(0 if ok else 1)
 
     if args.scheduler:
         from scheduler import run_internal_scheduler

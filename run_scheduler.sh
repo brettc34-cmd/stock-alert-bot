@@ -17,4 +17,8 @@ if [[ ! -x "$PYTHON" ]]; then
     PYTHON="$(dirname "$0")/.venv/bin/python"
 fi
 
+if [[ "${WEBHOOK_STARTUP_SELF_CHECK:-1}" =~ ^(1|true|yes|on)$ ]]; then
+    "$PYTHON" bot.py --self-check-webhook
+fi
+
 exec "$PYTHON" bot.py --scheduler

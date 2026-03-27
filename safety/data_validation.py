@@ -20,7 +20,10 @@ def validate_quote(quote: Dict[str, Any]) -> bool:
 def validate_config(config: Dict[str, Any]) -> bool:
     if not isinstance(config.get("stocks"), list):
         return False
-    if not os.environ.get("DISCORD_WEBHOOK_URL"):
+    webhook = (os.environ.get("DISCORD_WEBHOOK_URL") or "").strip().lower()
+    if not webhook:
+        return False
+    if "replace-me" in webhook:
         return False
     if not isinstance(config.get("ladder_step", 5), (int, float)):
         return False

@@ -65,3 +65,30 @@ jobs:
             storage/outcomes.db
             storage/execution_analytics.db
           key: bot-state-${{ github.ref_name }}-${{ github.run_id }}
+
+  notify-on-failure:
+    needs: run-alert-cycle
+    if: ${{ always() && needs.run-alert-cycle.result == 'failure' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send failure alert to Discord
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          WORKFLOW: ${{ github.workflow }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "DISCORD_WEBHOOK_URL secret is missing; skipping failure notification."
+            exit 0
+          fi
+          payload=$(cat <<EOF
+          {
+            "content": "Alert workflow failed. Workflow: ${WORKFLOW} | Repo: ${REPO} | Branch: ${BRANCH} | Run: ${RUN_URL}"
+          }
+          EOF
+          )
+          curl -sS -X POST "$DISCORD_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$payload"
